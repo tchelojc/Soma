@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Soma</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --g:#FFD700;--g2:#FF8C00;--bg:#05050e;--bg2:#0b0b1a;
+  --panel:rgba(13,13,30,0.98);--bdr:rgba(255,215,0,0.2);--bdr2:rgba(255,215,0,0.45);
+  --txt:#c8d4ee;--txt2:rgba(200,212,238,0.55);--red:#ff3d5a;--grn:#00ffaa;--r:12px
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font-family:"Rajdhani",sans-serif}
+#bgCanvas{position:fixed;inset:0;z-index:0;opacity:.4}
+/* ── Página de Login ── */
+#pgLogin{
+  position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  background:radial-gradient(ellipse at 50% 0%,rgba(255,165,0,.08) 0%,transparent 70%),var(--bg)
+}
+.login-box{
+  width:min(460px,92vw);background:var(--panel);border:1px solid var(--bdr2);
+  border-radius:20px;padding:44px 40px 40px;
+  box-shadow:0 0 60px rgba(255,165,0,.08),0 24px 80px rgba(0,0,0,.7);
+  animation:fadeUp .5s ease both
+}
+@keyframes fadeUp{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:none}}
+.login-logo{
+  font-family:"Orbitron",monospace;font-size:clamp(1.3rem,3.5vw,2rem);font-weight:900;
+  text-align:center;margin-bottom:6px;
+  background:linear-gradient(90deg,#ffd700,#ff8c00,#ffd700);background-size:200% auto;
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:shimmer 3s linear infinite
+}
+@keyframes shimmer{to{background-position:200% center}}
+.login-sub{text-align:center;font-size:.78rem;letter-spacing:.22em;color:rgba(255,215,0,.35);text-transform:uppercase;margin-bottom:32px}
+.sys-status{
+  display:flex;align-items:center;gap:8px;justify-content:center;margin-bottom:28px;
+  font-size:.72rem;letter-spacing:.18em;color:rgba(255,215,0,.4);text-transform:uppercase
+}
+.sys-dot{width:6px;height:6px;border-radius:50%;background:var(--g);box-shadow:0 0 6px var(--g);animation:pulse 1.8s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.3;transform:scale(.7)}}
+.key-input{
+  width:100%;padding:14px 18px;background:rgba(5,5,14,.85);border:1px solid var(--bdr);
+  border-radius:var(--r);color:#fff;font-family:"Rajdhani",sans-serif;font-size:1rem;
+  letter-spacing:.06em;outline:none;transition:.2s border-color,.2s box-shadow;margin-bottom:14px
+}
+.key-input:focus{border-color:var(--g);box-shadow:0 0 0 3px rgba(255,215,0,.07)}
+.key-input::placeholder{color:rgba(255,255,255,.18)}
+.btn-login{
+  width:100%;padding:14px;background:linear-gradient(135deg,var(--g2),var(--g));
+  color:#05050e;border:none;border-radius:var(--r);font-family:"Orbitron",monospace;
+  font-size:.8rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase;
+  cursor:pointer;transition:.25s transform,.25s box-shadow
+}
+.btn-login:hover{transform:translateY(-2px);box-shadow:0 0 30px rgba(255,165,0,.4)}
+.btn-login:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.alert{padding:11px 14px;border-radius:9px;font-size:.88rem;text-align:center;margin-top:12px;display:none}
+.alert-err{background:rgba(255,61,90,.1);border:1px solid rgba(255,61,90,.35);color:#ff7a90}
+.alert-ok{background:rgba(0,255,170,.08);border:1px solid rgba(0,255,170,.3);color:#00ffcc}
+/* ── Página Principal ── */
+#pgMain{position:fixed;inset:0;z-index:10;display:none;flex-direction:column;background:var(--bg2)}
+.topbar{
+  flex-shrink:0;display:flex;align-items:center;height:52px;padding:0 20px;gap:14px;
+  background:rgba(5,5,14,.97);border-bottom:1px solid var(--bdr);position:relative;z-index:20
+}
+.topbar-logo{
+  font-family:"Orbitron",monospace;font-size:.78rem;font-weight:900;letter-spacing:.12em;
+  background:linear-gradient(90deg,#ffd700,#ff8c00);-webkit-background-clip:text;-webkit-text-fill-color:transparent;white-space:nowrap
+}
+.topbar-sep{flex:1}
+.btn-sair{
+  padding:6px 14px;font-family:"Orbitron",monospace;font-size:.65rem;letter-spacing:.1em;
+  font-weight:700;background:transparent;border:1px solid rgba(255,61,90,.4);
+  color:rgba(255,61,90,.7);border-radius:8px;cursor:pointer;transition:.2s;white-space:nowrap
+}
+.btn-sair:hover{border-color:var(--red);color:var(--red)}
+/* Tabs de plataformas */
+.plat-nav{
+  flex-shrink:0;display:flex;align-items:stretch;background:rgba(5,5,14,.95);
+  border-bottom:1px solid var(--bdr);overflow-x:auto;scrollbar-width:none;padding:0 16px;gap:2px
+}
+.plat-nav::-webkit-scrollbar{display:none}
+.plat-tab{
+  display:flex;align-items:center;gap:8px;padding:0 20px;height:44px;
+  font-family:"Orbitron",monospace;font-size:.68rem;font-weight:700;letter-spacing:.1em;
+  text-transform:uppercase;color:rgba(255,215,0,.35);border-bottom:2px solid transparent;
+  cursor:pointer;white-space:nowrap;transition:.2s all;flex-shrink:0;
+  background:none;border-left:none;border-right:none;border-top:none
+}
+.plat-tab:hover{color:rgba(255,215,0,.7)}
+.plat-tab.ativo{color:var(--g);border-bottom-color:var(--g);background:rgba(255,215,0,.04)}
+.tab-badge{background:rgba(255,215,0,.12);border:1px solid rgba(255,215,0,.2);border-radius:20px;padding:1px 7px;font-size:.6rem;color:rgba(255,215,0,.5)}
+/* Viewer */
+.viewer-area{flex:1;overflow:hidden;position:relative}
+.plat-panel{position:absolute;inset:0;display:none;flex-direction:column}
+.plat-panel.ativo{display:flex}
+.file-selector{
+  position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;background:var(--bg2);gap:16px;padding:30px
+}
+.file-selector h2{font-family:"Orbitron",monospace;font-size:1rem;font-weight:700;letter-spacing:.12em;color:var(--g);margin-bottom:8px;text-align:center}
+.file-selector p{font-size:.85rem;color:var(--txt2);text-align:center;max-width:380px}
+.files-grid{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;max-width:700px}
+.file-btn{
+  display:flex;flex-direction:column;align-items:center;gap:8px;padding:20px 28px;
+  background:rgba(13,13,30,.9);border:1px solid var(--bdr);border-radius:14px;
+  cursor:pointer;transition:.25s all;min-width:130px;color:var(--txt);font-family:"Rajdhani",sans-serif
+}
+.file-btn:hover{border-color:var(--g);box-shadow:0 0 20px rgba(255,215,0,.12);transform:translateY(-3px)}
+.file-btn .fb-icon{font-size:2.4rem}
+.file-btn .fb-name{font-family:"Orbitron",monospace;font-size:.65rem;font-weight:700;letter-spacing:.05em;color:var(--g);text-align:center;word-break:break-all;max-width:120px}
+.file-btn .fb-size{font-size:.75rem;color:var(--txt2)}
+/* Content frame */
+.content-frame{position:absolute;inset:0;display:none;flex-direction:column}
+.content-frame.visivel{display:flex}
+.content-bar{
+  flex-shrink:0;display:flex;align-items:center;gap:10px;height:40px;padding:0 14px;
+  background:rgba(5,5,14,.97);border-bottom:1px solid var(--bdr);font-size:.72rem
+}
+.cb-back{
+  padding:4px 12px;font-family:"Orbitron",monospace;font-size:.62rem;letter-spacing:.1em;
+  font-weight:700;background:rgba(255,215,0,.08);border:1px solid var(--bdr);
+  color:rgba(255,215,0,.6);border-radius:7px;cursor:pointer;transition:.2s;flex-shrink:0
+}
+.cb-back:hover{border-color:var(--g);color:var(--g)}
+.cb-name{font-family:"Orbitron",monospace;font-size:.68rem;color:var(--g);letter-spacing:.08em;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cb-info{color:var(--txt2);font-size:.7rem;flex-shrink:0}
+.content-body{flex:1;overflow:hidden;position:relative;background:#fff}
+.content-body iframe{position:absolute;inset:0;width:100%;height:100%;border:none;display:block}
+.content-body.code-mode{background:rgba(3,3,10,.95);overflow:auto}
+.content-body pre{padding:24px;font-family:"Courier New",monospace;font-size:.83rem;line-height:1.6;color:#a8c8e8;white-space:pre-wrap;word-break:break-all;min-height:100%}
+/* Loading */
+.loading-overlay{
+  position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;background:var(--bg2);z-index:5;
+  font-family:"Orbitron",monospace;font-size:.75rem;letter-spacing:.2em;
+  color:rgba(255,215,0,.4);gap:16px
+}
+.spin{width:40px;height:40px;border:3px solid rgba(255,215,0,.1);border-top-color:var(--g);border-radius:50%;animation:spin .75s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* Cantos decorativos */
+.corner-tl,.corner-br{position:fixed;width:80px;height:80px;z-index:1;pointer-events:none}
+.corner-tl{top:0;left:0;border-top:2px solid rgba(255,215,0,.1);border-left:2px solid rgba(255,215,0,.1)}
+.corner-br{bottom:0;right:0;border-bottom:2px solid rgba(255,215,0,.1);border-right:2px solid rgba(255,215,0,.1)}
+@media(max-width:500px){.login-box{padding:32px 24px}.plat-tab{padding:0 12px;font-size:.6rem}}
+</style>
+</head>
+<body>
+<canvas id="bgCanvas"></canvas>
+<div class="corner-tl"></div>
+<div class="corner-br"></div>
+
+<!-- Página de Login -->
+<div id="pgLogin">
+  <div class="login-box">
+    <div class="login-logo">🔐 Soma</div>
+    <div class="login-sub">Acesso protegido · APPSCRIPT</div>
+    <div class="sys-status"><span class="sys-dot"></span>SISTEMA PROTEGIDO · AGUARDANDO AUTENTICAÇÃO</div>
+    <input id="chaveInput" class="key-input"
+           placeholder="Insira sua chave de licença (ex: UA-XXXXXXXX)"
+           autocomplete="off" spellcheck="false">
+    <button class="btn-login" id="btnLogin">🔓 ACESSAR SISTEMA</button>
+    <div id="alertErr" class="alert alert-err"></div>
+    <div id="alertOk"  class="alert alert-ok"></div>
+  </div>
+</div>
+
+<!-- Página Principal -->
+<div id="pgMain">
+  <div class="topbar">
+    <div class="topbar-logo">🔐 Soma</div>
+    <div class="topbar-sep"></div>
+    <button class="btn-sair" onclick="sair()">⏻ SAIR</button>
+  </div>
+  <nav class="plat-nav" id="platNav"></nav>
+  <div class="viewer-area" id="viewerArea">
+    <div class="loading-overlay" id="loadingPayload">
+      <div class="spin"></div>CARREGANDO CONTEÚDO...
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Configuração do backend ──
+
+        const CHAVE_MESTRA_OFFLINE = null;
+        const URL_BACKEND = "URL_DO_WEB_APP";
+
+
+const PAYLOAD_FILE  = "soma.enc";
+const PBKDF2_ITERS  = 100000;
+
+let chaveMestraAtual = null;
+let platAtiva        = 0;
+let plataformas      = null;
+const keyCache       = new Map();
+
+// ── Fingerprint do dispositivo ──
+async function fingerprint() {
+    const data = [
+        navigator.userAgent, navigator.language,
+        screen.width, screen.height, screen.colorDepth,
+        new Date().getTimezoneOffset(),
+        navigator.hardwareConcurrency || "?",
+        navigator.deviceMemory        || "?",
+        navigator.platform            || "?"
+    ];
+    const c = document.createElement("canvas");
+    c.width = 200; c.height = 50;
+    const ctx = c.getContext("2d");
+    ctx.textBaseline = "top"; ctx.font = "14px Arial";
+    ctx.fillStyle = "#f60"; ctx.fillRect(0,0,100,50);
+    ctx.fillStyle = "#069"; ctx.fillText("UA Fingerprint",2,15);
+    data.push(c.toDataURL());
+    if (document.fonts?.ready) {
+        await document.fonts.ready;
+        data.push(Array.from(document.fonts).map(f => f.family).join(","));
+    }
+    const enc = new TextEncoder();
+    const h   = await crypto.subtle.digest("SHA-256", enc.encode(data.join("|")));
+    return Array.from(new Uint8Array(h)).map(b => b.toString(16).padStart(2,"0")).join("");
+}
+
+// ── Validação com o backend ──
+async function validar() {
+    const chave = document.getElementById("chaveInput").value.trim().toUpperCase();
+    if (!chave) return;
+
+    const btn = document.getElementById("btnLogin");
+    btn.disabled   = true;
+    btn.innerText  = "🔐 VERIFICANDO...";
+
+    const fp = await fingerprint();
+
+    try {
+        let chaveMestra;
+
+        if (!URL_BACKEND && CHAVE_MESTRA_OFFLINE) {
+            // ── Modo offline: chave embutida, valida apenas localmente ──
+            const lics = JSON.parse(localStorage.getItem("ua_licencas") || "{}");
+            const lic  = lics[chave];
+            if (!lic || !lic.ativa || new Date() > new Date(lic.expiracao)) {
+                throw new Error("Licença inválida ou expirada (modo offline)");
+            }
+            chaveMestra = CHAVE_MESTRA_OFFLINE;
+
+        } else if (URL_BACKEND) {
+            // ── Modo online: consulta o backend ──
+            const body = { action: "validar", chave, fingerprint: fp };
+            const r    = await fetch(URL_BACKEND, {
+                method:  "POST",
+                headers: { "Content-Type": "application/json" },
+                body:    JSON.stringify(body)
+            });
+            if (!r.ok) throw new Error(`Backend retornou ${r.status}`);
+            const resp = await r.json();
+            if (!resp.ok) throw new Error(resp.error || "Autenticação negada");
+            chaveMestra = resp.chaveMestra;
+
+        } else {
+            throw new Error("Backend não configurado");
+        }
+
+        // Valida que a chave mestra é base64 de 32 bytes
+        const keyBytes = Uint8Array.from(atob(chaveMestra), c => c.charCodeAt(0));
+        if (keyBytes.length !== 32) throw new Error(`Chave inválida: ${keyBytes.length} bytes (esperado 32)`);
+
+        chaveMestraAtual = chaveMestra;
+
+        // Transição visual
+        document.getElementById("pgLogin").style.display = "none";
+        document.getElementById("pgMain").style.display  = "flex";
+
+        await carregarPayload();
+
+    } catch(e) {
+        mostrarErro(e.message);
+    } finally {
+        btn.disabled  = false;
+        btn.innerText = "🔓 ACESSAR SISTEMA";
+    }
+}
+
+// ── Carrega e descifra soma.enc em memória ──
+async function carregarPayload() {
+    try {
+        const r = await fetch(PAYLOAD_FILE);
+        if (!r.ok) throw new Error(`Payload "${PAYLOAD_FILE}" não encontrado. Verifique se está no mesmo diretório.`);
+
+        const buf = await r.arrayBuffer();
+
+        // Estrutura: nonce(12) + tag(16) + ciphertext
+        const nonce = new Uint8Array(buf.slice(0, 12));
+        const tag   = new Uint8Array(buf.slice(12, 28));
+        const ct    = new Uint8Array(buf.slice(28));
+
+        const keyBytes  = Uint8Array.from(atob(chaveMestraAtual), c => c.charCodeAt(0));
+        const cryptoKey = await crypto.subtle.importKey("raw", keyBytes, { name: "AES-GCM" }, false, ["decrypt"]);
+
+        // AES-GCM: ciphertext + tag concatenados
+        const decrypted = await crypto.subtle.decrypt(
+            { name: "AES-GCM", iv: nonce, tagLength: 128 },
+            cryptoKey,
+            new Uint8Array([...ct, ...tag])
+        );
+
+        plataformas = JSON.parse(new TextDecoder().decode(decrypted));
+        construirUI();
+        document.getElementById("loadingPayload").style.display = "none";
+        ativarPlat(0);
+
+    } catch(e) {
+        document.getElementById("viewerArea").innerHTML =
+            `<div style="color:#f55;text-align:center;padding:40px">❌ Erro ao carregar conteúdo: ${e.message}</div>`;
+    }
+}
+
+// ── Constrói a UI de plataformas/arquivos ──
+function construirUI() {
+    const nav  = document.getElementById("platNav");
+    const area = document.getElementById("viewerArea");
+    if (!nav || !area) return;
+    nav.innerHTML  = "";
+    area.innerHTML = "";
+
+    plataformas.forEach((p, pi) => {
+        // Tab de navegação
+        const tab = document.createElement("button");
+        tab.className = "plat-tab" + (pi === 0 ? " ativo" : "");
+        tab.onclick   = () => ativarPlat(pi);
+        tab.innerHTML = `<span>${p.icon}</span><span>${p.name}</span><span class="tab-badge">${p.arquivos.length}</span>`;
+        nav.appendChild(tab);
+
+        // Painel
+        const panel = document.createElement("div");
+        panel.className = "plat-panel" + (pi === 0 ? " ativo" : "");
+        panel.id        = `panel-${pi}`;
+
+        // Seletor de arquivos
+        const selector = document.createElement("div");
+        selector.className = "file-selector";
+        selector.id        = `sel-${pi}`;
+        selector.innerHTML = (p.descricao
+            ? `<h2>${p.icon} ${p.name}</h2><p>${p.descricao}</p>`
+            : `<h2>${p.icon} ${p.name}</h2>`)
+            + `<div class="files-grid" id="fg-${pi}"></div>`;
+
+        p.arquivos.forEach((a, ai) => {
+            const icon = { web: "🌐", python: "🐍", javascript: "⚡", php: "🐘" }[a.tipo] || "📄";
+            const btn  = document.createElement("div");
+            btn.className = "file-btn";
+            btn.onclick   = () => abrirArquivo(pi, ai);
+            btn.innerHTML = `<span class="fb-icon">${icon}</span>`
+                          + `<span class="fb-name">${a.filename}</span>`
+                          + `<span class="fb-size">${(a.tam/1024).toFixed(1)} KB</span>`;
+            selector.querySelector(`#fg-${pi}`).appendChild(btn);
+        });
+        panel.appendChild(selector);
+
+        // Frame de conteúdo
+        const frame = document.createElement("div");
+        frame.className = "content-frame";
+        frame.id        = `frame-${pi}`;
+        frame.innerHTML =
+            `<div class="content-bar">`
+          + `<button class="cb-back" onclick="fecharFrame(${pi})">← VOLTAR</button>`
+          + `<span class="cb-name" id="fname-${pi}"></span>`
+          + `<span class="cb-info" id="finfo-${pi}"></span>`
+          + `</div>`
+          + `<div class="content-body" id="fbody-${pi}">`
+          + `<div class="loading-overlay" id="fload-${pi}"><div class="spin"></div>DESCRIPTOGRAFANDO…</div>`
+          + `</div>`;
+        panel.appendChild(frame);
+        area.appendChild(panel);
+    });
+}
+
+function ativarPlat(pi) {
+    platAtiva = pi;
+    document.querySelectorAll(".plat-tab").forEach((t, i) => t.classList.toggle("ativo", i === pi));
+    document.querySelectorAll(".plat-panel").forEach((p, i) => p.classList.toggle("ativo", i === pi));
+}
+
+// ── Descriptografa e exibe um arquivo individual ──
+async function abrirArquivo(pi, ai) {
+    const p        = plataformas[pi];
+    const a        = p.arquivos[ai];
+    const selector = document.getElementById(`sel-${pi}`);
+    const frame    = document.getElementById(`frame-${pi}`);
+    const loader   = document.getElementById(`fload-${pi}`);
+    const body     = document.getElementById(`fbody-${pi}`);
+
+    selector.style.display = "none";
+    frame.classList.add("visivel");
+    loader.style.display = "flex";
+    document.getElementById(`fname-${pi}`).textContent = a.filename;
+    document.getElementById(`finfo-${pi}`).textContent = `${(a.tam/1024).toFixed(1)} KB · ${a.tipo}`;
+
+    try {
+        const key       = await obterChaveCripto(a.nonce);
+        const decrypted = await descriptografarBloco(key, a.nonce, a.tag, a.data);
+        const text      = new TextDecoder().decode(decrypted);
+
+        loader.style.display = "none";
+
+        if (a.tipo === "web") {
+            body.className = "content-body";
+            body.innerHTML = `<iframe id="ci-${pi}" style="width:100%;height:100%;border:none"></iframe>`;
+            // srcdoc — conteúdo nunca aparece no "Ver código-fonte"
+            document.getElementById(`ci-${pi}`).srcdoc = text;
+        } else {
+            body.className = "content-body code-mode";
+            body.innerHTML = `<pre>${text.replace(/</g,"&lt;").replace(/>/g,"&gt;")}</pre>`;
+        }
+
+        // Auto-destruição após exibir
+        // (sem auto-destruição)
+
+    } catch(e) {
+        loader.style.display = "none";
+        body.className = "content-body code-mode";
+        body.innerHTML = `<pre style="color:#ff7a90">❌ Erro: ${e.message}</pre>`;
+    }
+}
+
+function fecharFrame(pi) {
+    const frame    = document.getElementById(`frame-${pi}`);
+    const selector = document.getElementById(`sel-${pi}`);
+    const body     = document.getElementById(`fbody-${pi}`);
+    frame.classList.remove("visivel");
+    selector.style.display = "";
+    body.innerHTML = `<div class="loading-overlay" id="fload-${pi}"><div class="spin"></div>DESCRIPTOGRAFANDO…</div>`;
+    body.className = "content-body";
+}
+
+// ── Helpers de criptografia AES-GCM ──
+async function obterChaveCripto(nonceB64) {
+    if (keyCache.has(nonceB64)) return keyCache.get(nonceB64);
+
+    let kb = Uint8Array.from(atob(chaveMestraAtual), c => c.charCodeAt(0));
+    // Garante 16 ou 32 bytes
+    if      (kb.length < 16) { const p = new Uint8Array(16); p.set(kb); kb = p; }
+    else if (kb.length < 32) { const p = new Uint8Array(32); p.set(kb); kb = p; }
+    else if (kb.length > 32)   kb = kb.slice(0, 32);
+
+    const k = await crypto.subtle.importKey("raw", kb, { name: "AES-GCM" }, false, ["decrypt"]);
+    keyCache.set(nonceB64, k);
+    return k;
+}
+
+async function descriptografarBloco(key, nonceB64, tagB64, dataB64) {
+    const iv  = Uint8Array.from(atob(nonceB64), c => c.charCodeAt(0));
+    const tag = Uint8Array.from(atob(tagB64),   c => c.charCodeAt(0));
+    const d   = Uint8Array.from(atob(dataB64),  c => c.charCodeAt(0));
+    return crypto.subtle.decrypt(
+        { name: "AES-GCM", iv, tagLength: 128 },
+        key,
+        new Uint8Array([...d, ...tag])
+    );
+}
+
+// ── Alertas ──
+function mostrarErro(msg) {
+    const el = document.getElementById("alertErr");
+    el.textContent = "❌ " + msg;
+    el.style.display = "block";
+    setTimeout(() => el.style.display = "none", 6000);
+}
+
+function sair() {
+    window.location.reload();
+}
+
+// ── Inicialização ──
+window.addEventListener("DOMContentLoaded", () => {
+    document.getElementById("btnLogin").onclick = validar;
+    document.getElementById("chaveInput").addEventListener("keypress", e => {
+        if (e.key === "Enter") validar();
+    });
+    
+
+    // Fundo animado (grade dourada)
+    const c   = document.getElementById("bgCanvas");
+    const ctx = c.getContext("2d");
+    let t = 0;
+    function resize() { c.width = innerWidth; c.height = innerHeight; }
+    function draw() {
+        ctx.clearRect(0,0,c.width,c.height);
+        ctx.strokeStyle = `rgba(255,215,0,${0.025 + 0.01*Math.sin(t*0.5)})`;
+        ctx.lineWidth   = 0.5;
+        for (let i = 0; i <= c.width;  i += 40) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,c.height); ctx.stroke(); }
+        for (let i = 0; i <= c.height; i += 40) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(c.width,i); ctx.stroke(); }
+        t += 0.02;
+        requestAnimationFrame(draw);
+    }
+    window.addEventListener("resize", resize);
+    resize();
+    draw();
+});
+</script>
+</body>
+</html>
