@@ -3,14 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>soma</title>
+<title>Soma</title>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600&display=swap" rel="stylesheet">
 <style>
-:root{--g:#FFD700;--g2:#FF8C00;--bg:#05050e;--bg2:#0b0b1a;--panel:rgba(13,13,30,0.98);--bdr:rgba(255,215,0,0.2);--bdr2:rgba(255,215,0,0.45);--txt:#c8d4ee;--txt2:rgba(200,212,238,0.55);--red:#ff3d5a;--r:12px}
+/* (estilos mantidos exatamente iguais aos originais) */
+:root{--g:#FFD700;--g2:#FF8C00;--bg:#05050e;--bg2:#0b0b1a;--panel:rgba(13,13,30,0.98);--bdr:rgba(255,215,0,0.2);--bdr2:rgba(255,215,0,0.45);--txt:#c8d4ee;--txt2:rgba(200,212,238,0.55);--red:#ff3d5a;--grn:#00ffaa;--r:12px}
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
 html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font-family:"Rajdhani",sans-serif}
 #bgCanvas{position:fixed;inset:0;z-index:0;opacity:.4}
-#pgLogin{position:fixed;inset:0;z-index:10;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 0%,rgba(255,165,0,.08) 0%,transparent 70%),var(--bg)}
+#pgLogin{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 0%,rgba(255,165,0,.08) 0%,transparent 70%),var(--bg)}
 .login-box{width:min(460px,92vw);background:var(--panel);border:1px solid var(--bdr2);border-radius:20px;padding:44px 40px 40px;box-shadow:0 0 60px rgba(255,165,0,.08),0 24px 80px rgba(0,0,0,.7);animation:fadeUp .5s ease both}
 @keyframes fadeUp{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:none}}
 .login-logo{font-family:"Orbitron",monospace;font-size:clamp(1.3rem,3.5vw,2rem);font-weight:900;text-align:center;margin-bottom:6px;background:linear-gradient(90deg,#ffd700,#ff8c00,#ffd700);background-size:200% auto;-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:shimmer 3s linear infinite}
@@ -78,7 +79,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(
 
 <div id="pgLogin">
   <div class="login-box">
-    <div class="login-logo">🔐 soma</div>
+    <div class="login-logo">🔐 Soma</div>
     <div class="login-sub">Acesso protegido · APPSCRIPT</div>
     <div class="sys-status"><span class="sys-dot"></span>SISTEMA PROTEGIDO · AGUARDANDO AUTENTICAÇÃO</div>
     <input id="chaveInput" class="key-input" placeholder="Insira sua chave de licença (ex: UA-XXXXXXXX)" autocomplete="off">
@@ -90,7 +91,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(
 
 <div id="pgMain">
   <div class="topbar">
-    <div class="topbar-logo">🔐 soma</div>
+    <div class="topbar-logo">🔐 Soma</div>
     <div class="topbar-sep"></div>
     <button class="btn-sair" onclick="sair()">⏻ SAIR</button>
   </div>
@@ -101,18 +102,28 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(
 </div>
 
 <script>
-const URL_BACKEND = "https://script.google.com/macros/s/AKfycbwviQHC6ltkEjRVrsrzrwdho9qi2Dcy4TO5LODmCBXYlV_kSxj581iuw9PcEsCIj3pFIg/exec";
+// ========== CONFIGURAÇÃO ==========
+
+        const CHAVE_MESTRA_OFFLINE = null;
+        const URL_BACKEND = "https://script.google.com/macros/s/AKfycbwqrxdq-ukxvxq2z0dTDT2cZ35PonF_CbWvNg1NHV8Zy62oV3BuvI3jYzQStN4sZoaJyA/exec";
+        console.log("🌐 Modo online. Backend:", URL_BACKEND);
+
 const PAYLOAD_FILE = "soma.enc";
 
 let chaveMestraAtual = null;
 let plataformas = null;
+let platAtiva = 0;
 const keyCache = new Map();
 
+// ========== FINGERPRINT DO DISPOSITIVO ==========
 async function fingerprint() {
     const data = [
-        navigator.userAgent, navigator.language, screen.width, screen.height, screen.colorDepth,
-        new Date().getTimezoneOffset(), navigator.hardwareConcurrency || "?",
-        navigator.deviceMemory || "?", navigator.platform || "?"
+        navigator.userAgent, navigator.language,
+        screen.width, screen.height, screen.colorDepth,
+        new Date().getTimezoneOffset(),
+        navigator.hardwareConcurrency || "?",
+        navigator.deviceMemory || "?",
+        navigator.platform || "?"
     ];
     const c = document.createElement("canvas");
     c.width = 200; c.height = 50;
@@ -127,82 +138,127 @@ async function fingerprint() {
     }
     const enc = new TextEncoder();
     const h = await crypto.subtle.digest("SHA-256", enc.encode(data.join("|")));
-    return Array.from(new Uint8Array(h)).map(b => b.toString(16).padStart(2,"0")).join("");
+    const fp = Array.from(new Uint8Array(h)).map(b => b.toString(16).padStart(2,"0")).join("");
+    console.log("🆔 Fingerprint gerado:", fp.substring(0,16) + "...");
+    return fp;
 }
 
+// ========== VALIDAÇÃO DA LICENÇA (GET) ==========
 async function validar() {
     const chave = document.getElementById("chaveInput").value.trim().toUpperCase();
     if (!chave) return;
+    console.log("🔑 Validando chave:", chave);
+
     const btn = document.getElementById("btnLogin");
     btn.disabled = true;
     btn.innerText = "🔐 VERIFICANDO...";
     const fp = await fingerprint();
+
     try {
-        const url = `${URL_BACKEND}?action=validar&chave=${encodeURIComponent(chave)}&fingerprint=${encodeURIComponent(fp)}`;
-        const r = await fetch(url);
-        if (!r.ok) throw new Error(`Backend retornou ${r.status}`);
-        const resp = await r.json();
-        if (!resp.ok) throw new Error(resp.error || "Autenticação negada");
-        const chaveMestra = resp.chaveMestra;
+        let chaveMestra;
+
+        if (!URL_BACKEND && CHAVE_MESTRA_OFFLINE) {
+            console.log("📴 Modo offline: validando localmente...");
+            const lics = JSON.parse(localStorage.getItem("ua_licencas") || "{}");
+            const lic = lics[chave];
+            if (!lic || !lic.ativa || new Date() > new Date(lic.expiracao)) {
+                throw new Error("Licença inválida ou expirada (modo offline)");
+            }
+            chaveMestra = CHAVE_MESTRA_OFFLINE;
+        } else if (URL_BACKEND) {
+            console.log("🌐 Modo online: consultando backend via GET...");
+            const url = `${URL_BACKEND}?action=validar&chave=${encodeURIComponent(chave)}&fingerprint=${encodeURIComponent(fp)}`;
+            console.log("📡 GET:", url);
+            const r = await fetch(url);
+            if (!r.ok) throw new Error(`HTTP ${r.status} - ${r.statusText}`);
+            const resp = await r.json();
+            if (!resp.ok) throw new Error(resp.error || "Autenticação negada");
+            chaveMestra = resp.chaveMestra;
+            console.log("✅ Backend validou. Watermark:", resp.watermark);
+        } else {
+            throw new Error("Backend não configurado");
+        }
+
+        // Valida chave mestra
         const keyBytes = Uint8Array.from(atob(chaveMestra), c => c.charCodeAt(0));
-        if (keyBytes.length !== 32) throw new Error("Chave mestra inválida");
+        if (keyBytes.length !== 32) throw new Error(`Chave mestra inválida: ${keyBytes.length} bytes (esperado 32)`);
         chaveMestraAtual = chaveMestra;
+        console.log("🔓 Chave mestra OK. Carregando payload...");
+
         document.getElementById("pgLogin").style.display = "none";
         document.getElementById("pgMain").style.display = "flex";
         await carregarPayload();
         function _markDestroyed() {}
         _markDestroyed();
     } catch(e) {
-        const el = document.getElementById("alertErr");
-        el.textContent = "❌ " + e.message;
-        el.style.display = "block";
-        setTimeout(() => el.style.display = "none", 6000);
+        console.error("❌ Erro na validação:", e.message);
+        mostrarErro(e.message);
     } finally {
         btn.disabled = false;
         btn.innerText = "🔓 ACESSAR SISTEMA";
     }
 }
 
+// ========== CARREGAR E DESCRIPTOGRAFAR PAYLOAD ==========
 async function carregarPayload() {
     try {
+        console.log("📦 Buscando payload:", PAYLOAD_FILE);
         const r = await fetch(PAYLOAD_FILE);
-        if (!r.ok) throw new Error("Payload não encontrado");
+        if (!r.ok) throw new Error(`Payload "${PAYLOAD_FILE}" não encontrado (HTTP ${r.status})`);
         const buf = await r.arrayBuffer();
-        const nonce = new Uint8Array(buf.slice(0,12));
-        const tag = new Uint8Array(buf.slice(12,28));
+        console.log("📀 Payload recebido, tamanho:", buf.byteLength, "bytes");
+
+        const nonce = new Uint8Array(buf.slice(0, 12));
+        const tag = new Uint8Array(buf.slice(12, 28));
         const ct = new Uint8Array(buf.slice(28));
+        console.log("🔐 nonce(12) + tag(16) + ciphertext(", ct.length, ")");
+
         const keyBytes = Uint8Array.from(atob(chaveMestraAtual), c => c.charCodeAt(0));
         const cryptoKey = await crypto.subtle.importKey("raw", keyBytes, { name: "AES-GCM" }, false, ["decrypt"]);
-        const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv: nonce, tagLength: 128 }, cryptoKey, new Uint8Array([...ct, ...tag]));
+        const decrypted = await crypto.subtle.decrypt(
+            { name: "AES-GCM", iv: nonce, tagLength: 128 },
+            cryptoKey,
+            new Uint8Array([...ct, ...tag])
+        );
+        console.log("✅ Payload descriptografado com sucesso.");
+
         plataformas = JSON.parse(new TextDecoder().decode(decrypted));
+        console.log("📂 Plataformas carregadas:", plataformas.length);
         construirUI();
         document.getElementById("loadingPayload").style.display = "none";
         ativarPlat(0);
     } catch(e) {
-        document.getElementById("viewerArea").innerHTML = `<div style="color:#f55;text-align:center;padding:40px">❌ Erro: ${e.message}</div>`;
+        console.error("❌ Erro ao carregar payload:", e);
+        document.getElementById("viewerArea").innerHTML = `<div style="color:#f55;text-align:center;padding:40px">❌ Erro ao carregar conteúdo: ${e.message}</div>`;
     }
 }
 
+// ========== CONSTRUÇÃO DA INTERFACE ==========
 function construirUI() {
     const nav = document.getElementById("platNav");
     const area = document.getElementById("viewerArea");
+    if (!nav || !area) return;
     nav.innerHTML = "";
     area.innerHTML = "";
+
     plataformas.forEach((p, pi) => {
         const tab = document.createElement("button");
-        tab.className = "plat-tab" + (pi===0?" ativo":"");
+        tab.className = "plat-tab" + (pi === 0 ? " ativo" : "");
         tab.onclick = () => ativarPlat(pi);
         tab.innerHTML = `<span>${p.icon}</span><span>${p.name}</span><span class="tab-badge">${p.arquivos.length}</span>`;
         nav.appendChild(tab);
+
         const panel = document.createElement("div");
-        panel.className = "plat-panel" + (pi===0?" ativo":"");
+        panel.className = "plat-panel" + (pi === 0 ? " ativo" : "");
         panel.id = `panel-${pi}`;
+
         const selector = document.createElement("div");
         selector.className = "file-selector";
         selector.id = `sel-${pi}`;
         selector.innerHTML = (p.descricao ? `<h2>${p.icon} ${p.name}</h2><p>${p.descricao}</p>` : `<h2>${p.icon} ${p.name}</h2>`) + `<div class="files-grid" id="fg-${pi}"></div>`;
+
         p.arquivos.forEach((a, ai) => {
-            const icon = { web:"🌐", python:"🐍", javascript:"⚡", php:"🐘" }[a.tipo] || "📄";
+            const icon = { web: "🌐", python: "🐍", javascript: "⚡", php: "🐘" }[a.tipo] || "📄";
             const btn = document.createElement("div");
             btn.className = "file-btn";
             btn.onclick = () => abrirArquivo(pi, ai);
@@ -210,6 +266,7 @@ function construirUI() {
             selector.querySelector(`#fg-${pi}`).appendChild(btn);
         });
         panel.appendChild(selector);
+
         const frame = document.createElement("div");
         frame.className = "content-frame";
         frame.id = `frame-${pi}`;
@@ -217,38 +274,48 @@ function construirUI() {
         panel.appendChild(frame);
         area.appendChild(panel);
     });
+    console.log("🎨 UI construída.");
 }
 
 function ativarPlat(pi) {
-    document.querySelectorAll(".plat-tab").forEach((t,i)=>t.classList.toggle("ativo",i===pi));
-    document.querySelectorAll(".plat-panel").forEach((p,i)=>p.classList.toggle("ativo",i===pi));
+    platAtiva = pi;
+    document.querySelectorAll(".plat-tab").forEach((t, i) => t.classList.toggle("ativo", i === pi));
+    document.querySelectorAll(".plat-panel").forEach((p, i) => p.classList.toggle("ativo", i === pi));
 }
 
+// ========== ABRIR ARQUIVO INDIVIDUAL ==========
 async function abrirArquivo(pi, ai) {
     const a = plataformas[pi].arquivos[ai];
     const selector = document.getElementById(`sel-${pi}`);
     const frame = document.getElementById(`frame-${pi}`);
     const loader = document.getElementById(`fload-${pi}`);
     const body = document.getElementById(`fbody-${pi}`);
+
     selector.style.display = "none";
     frame.classList.add("visivel");
     loader.style.display = "flex";
     document.getElementById(`fname-${pi}`).textContent = a.filename;
     document.getElementById(`finfo-${pi}`).textContent = `${(a.tam/1024).toFixed(1)} KB · ${a.tipo}`;
+    console.log(`📄 Abrindo arquivo: ${a.filename}`);
+
     try {
         const key = await obterChaveCripto(a.nonce);
         const decrypted = await descriptografarBloco(key, a.nonce, a.tag, a.data);
         const text = new TextDecoder().decode(decrypted);
         loader.style.display = "none";
+
         if (a.tipo === "web") {
             body.className = "content-body";
             body.innerHTML = `<iframe id="ci-${pi}" style="width:100%;height:100%;border:none"></iframe>`;
             document.getElementById(`ci-${pi}`).srcdoc = text;
+            console.log("🌐 Conteúdo web injetado via srcdoc.");
         } else {
             body.className = "content-body code-mode";
             body.innerHTML = `<pre>${text.replace(/</g,"&lt;").replace(/>/g,"&gt;")}</pre>`;
+            console.log("📝 Conteúdo texto exibido.");
         }
     } catch(e) {
+        console.error("❌ Erro ao descriptografar arquivo:", e);
         loader.style.display = "none";
         body.className = "content-body code-mode";
         body.innerHTML = `<pre style="color:#ff7a90">❌ Erro: ${e.message}</pre>`;
@@ -265,35 +332,50 @@ function fecharFrame(pi) {
     body.className = "content-body";
 }
 
+// ========== CRIPTOGRAFIA ==========
 async function obterChaveCripto(nonceB64) {
     if (keyCache.has(nonceB64)) return keyCache.get(nonceB64);
-    let kb = Uint8Array.from(atob(chaveMestraAtual), c=>c.charCodeAt(0));
+    let kb = Uint8Array.from(atob(chaveMestraAtual), c => c.charCodeAt(0));
     if (kb.length < 16) { const p = new Uint8Array(16); p.set(kb); kb = p; }
     else if (kb.length < 32) { const p = new Uint8Array(32); p.set(kb); kb = p; }
-    else if (kb.length > 32) kb = kb.slice(0,32);
+    else if (kb.length > 32) kb = kb.slice(0, 32);
     const k = await crypto.subtle.importKey("raw", kb, { name: "AES-GCM" }, false, ["decrypt"]);
     keyCache.set(nonceB64, k);
     return k;
 }
 
 async function descriptografarBloco(key, nonceB64, tagB64, dataB64) {
-    const iv = Uint8Array.from(atob(nonceB64), c=>c.charCodeAt(0));
-    const tag = Uint8Array.from(atob(tagB64), c=>c.charCodeAt(0));
-    const d = Uint8Array.from(atob(dataB64), c=>c.charCodeAt(0));
+    const iv = Uint8Array.from(atob(nonceB64), c => c.charCodeAt(0));
+    const tag = Uint8Array.from(atob(tagB64), c => c.charCodeAt(0));
+    const d = Uint8Array.from(atob(dataB64), c => c.charCodeAt(0));
     return crypto.subtle.decrypt({ name: "AES-GCM", iv, tagLength: 128 }, key, new Uint8Array([...d, ...tag]));
 }
 
-function sair() { window.location.reload(); }
+// ========== UTILITÁRIOS ==========
+function mostrarErro(msg) {
+    const el = document.getElementById("alertErr");
+    el.textContent = "❌ " + msg;
+    el.style.display = "block";
+    setTimeout(() => el.style.display = "none", 6000);
+}
 
+function sair() {
+    window.location.reload();
+}
+
+// ========== INICIALIZAÇÃO ==========
 window.addEventListener("DOMContentLoaded", () => {
+    console.log("🚀 UNIVERSO ÁUREO GATEWAY v8.0");
     document.getElementById("btnLogin").onclick = validar;
     document.getElementById("chaveInput").addEventListener("keypress", e => { if (e.key === "Enter") validar(); });
+
+    // Fundo animado
     const c = document.getElementById("bgCanvas"), ctx = c.getContext("2d");
     let t = 0;
     function resize() { c.width = innerWidth; c.height = innerHeight; }
     function draw() {
         ctx.clearRect(0,0,c.width,c.height);
-        ctx.strokeStyle = `rgba(255,215,0,${0.025+0.01*Math.sin(t*0.5)})`;
+        ctx.strokeStyle = `rgba(255,215,0,${0.025 + 0.01*Math.sin(t*0.5)})`;
         ctx.lineWidth = 0.5;
         for(let i=0;i<=c.width;i+=40){ ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,c.height); ctx.stroke(); }
         for(let i=0;i<=c.height;i+=40){ ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(c.width,i); ctx.stroke(); }
