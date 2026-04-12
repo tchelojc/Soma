@@ -6,7 +6,6 @@
 <title>Soma</title>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600&display=swap" rel="stylesheet">
 <style>
-/* (estilos mantidos exatamente iguais aos originais) */
 :root{--g:#FFD700;--g2:#FF8C00;--bg:#05050e;--bg2:#0b0b1a;--panel:rgba(13,13,30,0.98);--bdr:rgba(255,215,0,0.2);--bdr2:rgba(255,215,0,0.45);--txt:#c8d4ee;--txt2:rgba(200,212,238,0.55);--red:#ff3d5a;--grn:#00ffaa;--r:12px}
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
 html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font-family:"Rajdhani",sans-serif}
@@ -224,12 +223,17 @@ async function carregarPayload() {
 
         plataformas = JSON.parse(new TextDecoder().decode(decrypted));
         console.log("📂 Plataformas carregadas:", plataformas.length);
+
+        // ✅ CORREÇÃO: esconde o loading ANTES de reconstruir a UI (evita erro de null)
+        const loaderEl = document.getElementById("loadingPayload");
+        if (loaderEl) loaderEl.style.display = "none";
+
         construirUI();
-        document.getElementById("loadingPayload").style.display = "none";
         ativarPlat(0);
     } catch(e) {
         console.error("❌ Erro ao carregar payload:", e);
-        document.getElementById("viewerArea").innerHTML = `<div style="color:#f55;text-align:center;padding:40px">❌ Erro ao carregar conteúdo: ${e.message}</div>`;
+        const area = document.getElementById("viewerArea");
+        if (area) area.innerHTML = `<div style="color:#f55;text-align:center;padding:40px">❌ Erro ao carregar conteúdo: ${e.message}</div>`;
     }
 }
 
@@ -354,9 +358,11 @@ async function descriptografarBloco(key, nonceB64, tagB64, dataB64) {
 // ========== UTILITÁRIOS ==========
 function mostrarErro(msg) {
     const el = document.getElementById("alertErr");
-    el.textContent = "❌ " + msg;
-    el.style.display = "block";
-    setTimeout(() => el.style.display = "none", 6000);
+    if (el) {
+        el.textContent = "❌ " + msg;
+        el.style.display = "block";
+        setTimeout(() => el.style.display = "none", 6000);
+    }
 }
 
 function sair() {
