@@ -184,10 +184,8 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(
 
 <script>
 // ── Configuração do backend ──
-
-        const CHAVE_MESTRA_OFFLINE = null;
-        const URL_BACKEND = "https://script.google.com/macros/s/AKfycbx3quBsTA9mFRSdTvucQjMRmWncEagbvGrO9dj2IPrN/exec";
-
+const CHAVE_MESTRA_OFFLINE = null;
+const URL_BACKEND = "https://script.google.com/macros/s/AKfycbx3quBsTA9mFRSdTvucQjMRmWncEagbvGrO9dj2IPrN/exec";
 
 const PAYLOAD_FILE  = "soma.enc";
 const PBKDF2_ITERS  = 100000;
@@ -223,14 +221,14 @@ async function fingerprint() {
     return Array.from(new Uint8Array(h)).map(b => b.toString(16).padStart(2,"0")).join("");
 }
 
-// ── Validação com o backend ──
+// ── Validação com o backend (GET, sem CORS) ──
 async function validar() {
     const chave = document.getElementById("chaveInput").value.trim().toUpperCase();
     if (!chave) return;
 
     const btn = document.getElementById("btnLogin");
-    btn.disabled   = true;
-    btn.innerText  = "🔐 VERIFICANDO...";
+    btn.disabled = true;
+    btn.innerText = "🔐 VERIFICANDO...";
 
     const fp = await fingerprint();
 
@@ -238,14 +236,13 @@ async function validar() {
         let chaveMestra;
 
         if (!URL_BACKEND && CHAVE_MESTRA_OFFLINE) {
-            // ── Modo offline: chave embutida, valida apenas localmente ──
+            // Modo offline
             const lics = JSON.parse(localStorage.getItem("ua_licencas") || "{}");
-            const lic  = lics[chave];
+            const lic = lics[chave];
             if (!lic || !lic.ativa || new Date() > new Date(lic.expiracao)) {
                 throw new Error("Licença inválida ou expirada (modo offline)");
             }
             chaveMestra = CHAVE_MESTRA_OFFLINE;
-
         } else if (URL_BACKEND) {
             const url = `${URL_BACKEND}?action=validar&chave=${encodeURIComponent(chave)}&fingerprint=${encodeURIComponent(fp)}`;
             const r = await fetch(url);
@@ -253,41 +250,37 @@ async function validar() {
             const resp = await r.json();
             if (!resp.ok) throw new Error(resp.error || "Autenticação negada");
             chaveMestra = resp.chaveMestra;
-        }
-
         } else {
             throw new Error("Backend não configurado");
         }
 
-        // Valida que a chave mestra é base64 de 32 bytes
         const keyBytes = Uint8Array.from(atob(chaveMestra), c => c.charCodeAt(0));
-        if (keyBytes.length !== 32) throw new Error(`Chave inválida: ${keyBytes.length} bytes (esperado 32)`);
+        if (keyBytes.length !== 32) {
+            throw new Error(`Chave inválida: ${keyBytes.length} bytes (esperado 32)`);
+        }
 
         chaveMestraAtual = chaveMestra;
 
-        // Transição visual
         document.getElementById("pgLogin").style.display = "none";
-        document.getElementById("pgMain").style.display  = "flex";
+        document.getElementById("pgMain").style.display = "flex";
 
         await carregarPayload();
 
-    } catch(e) {
+    } catch (e) {
         mostrarErro(e.message);
     } finally {
-        btn.disabled  = false;
+        btn.disabled = false;
         btn.innerText = "🔓 ACESSAR SISTEMA";
     }
 }
 
-// ── Carrega e descifra soma.enc em memória ──
+// ── Carrega e descriptografa soma.enc ──
 async function carregarPayload() {
     try {
         const r = await fetch(PAYLOAD_FILE);
-        if (!r.ok) throw new Error(`Payload "${PAYLOAD_FILE}" não encontrado. Verifique se está no mesmo diretório.`);
+        if (!r.ok) throw new Error(`Payload "${PAYLOAD_FILE}" não encontrado.`);
 
         const buf = await r.arrayBuffer();
-
-        // Estrutura: nonce(12) + tag(16) + ciphertext
         const nonce = new Uint8Array(buf.slice(0, 12));
         const tag   = new Uint8Array(buf.slice(12, 28));
         const ct    = new Uint8Array(buf.slice(28));
@@ -295,7 +288,6 @@ async function carregarPayload() {
         const keyBytes  = Uint8Array.from(atob(chaveMestraAtual), c => c.charCodeAt(0));
         const cryptoKey = await crypto.subtle.importKey("raw", keyBytes, { name: "AES-GCM" }, false, ["decrypt"]);
 
-        // AES-GCM: ciphertext + tag concatenados
         const decrypted = await crypto.subtle.decrypt(
             { name: "AES-GCM", iv: nonce, tagLength: 128 },
             cryptoKey,
@@ -306,14 +298,12 @@ async function carregarPayload() {
         construirUI();
         document.getElementById("loadingPayload").style.display = "none";
         ativarPlat(0);
-
     } catch(e) {
-        document.getElementById("viewerArea").innerHTML =
-            `<div style="color:#f55;text-align:center;padding:40px">❌ Erro ao carregar conteúdo: ${e.message}</div>`;
+        document.getElementById("viewerArea").innerHTML = `<div style="color:#f55;text-align:center;padding:40px">❌ Erro ao carregar conteúdo: ${e.message}</div>`;
     }
 }
 
-// ── Constrói a UI de plataformas/arquivos ──
+// ── Constrói a UI ──
 function construirUI() {
     const nav  = document.getElementById("platNav");
     const area = document.getElementById("viewerArea");
@@ -322,52 +312,35 @@ function construirUI() {
     area.innerHTML = "";
 
     plataformas.forEach((p, pi) => {
-        // Tab de navegação
         const tab = document.createElement("button");
         tab.className = "plat-tab" + (pi === 0 ? " ativo" : "");
         tab.onclick   = () => ativarPlat(pi);
         tab.innerHTML = `<span>${p.icon}</span><span>${p.name}</span><span class="tab-badge">${p.arquivos.length}</span>`;
         nav.appendChild(tab);
 
-        // Painel
         const panel = document.createElement("div");
         panel.className = "plat-panel" + (pi === 0 ? " ativo" : "");
-        panel.id        = `panel-${pi}`;
+        panel.id = `panel-${pi}`;
 
-        // Seletor de arquivos
         const selector = document.createElement("div");
         selector.className = "file-selector";
-        selector.id        = `sel-${pi}`;
-        selector.innerHTML = (p.descricao
-            ? `<h2>${p.icon} ${p.name}</h2><p>${p.descricao}</p>`
-            : `<h2>${p.icon} ${p.name}</h2>`)
-            + `<div class="files-grid" id="fg-${pi}"></div>`;
+        selector.id = `sel-${pi}`;
+        selector.innerHTML = (p.descricao ? `<h2>${p.icon} ${p.name}</h2><p>${p.descricao}</p>` : `<h2>${p.icon} ${p.name}</h2>`) + `<div class="files-grid" id="fg-${pi}"></div>`;
 
         p.arquivos.forEach((a, ai) => {
             const icon = { web: "🌐", python: "🐍", javascript: "⚡", php: "🐘" }[a.tipo] || "📄";
-            const btn  = document.createElement("div");
+            const btn = document.createElement("div");
             btn.className = "file-btn";
-            btn.onclick   = () => abrirArquivo(pi, ai);
-            btn.innerHTML = `<span class="fb-icon">${icon}</span>`
-                          + `<span class="fb-name">${a.filename}</span>`
-                          + `<span class="fb-size">${(a.tam/1024).toFixed(1)} KB</span>`;
+            btn.onclick = () => abrirArquivo(pi, ai);
+            btn.innerHTML = `<span class="fb-icon">${icon}</span><span class="fb-name">${a.filename}</span><span class="fb-size">${(a.tam/1024).toFixed(1)} KB</span>`;
             selector.querySelector(`#fg-${pi}`).appendChild(btn);
         });
         panel.appendChild(selector);
 
-        // Frame de conteúdo
         const frame = document.createElement("div");
         frame.className = "content-frame";
-        frame.id        = `frame-${pi}`;
-        frame.innerHTML =
-            `<div class="content-bar">`
-          + `<button class="cb-back" onclick="fecharFrame(${pi})">← VOLTAR</button>`
-          + `<span class="cb-name" id="fname-${pi}"></span>`
-          + `<span class="cb-info" id="finfo-${pi}"></span>`
-          + `</div>`
-          + `<div class="content-body" id="fbody-${pi}">`
-          + `<div class="loading-overlay" id="fload-${pi}"><div class="spin"></div>DESCRIPTOGRAFANDO…</div>`
-          + `</div>`;
+        frame.id = `frame-${pi}`;
+        frame.innerHTML = `<div class="content-bar"><button class="cb-back" onclick="fecharFrame(${pi})">← VOLTAR</button><span class="cb-name" id="fname-${pi}"></span><span class="cb-info" id="finfo-${pi}"></span></div><div class="content-body" id="fbody-${pi}"><div class="loading-overlay" id="fload-${pi}"><div class="spin"></div>DESCRIPTOGRAFANDO…</div></div>`;
         panel.appendChild(frame);
         area.appendChild(panel);
     });
@@ -379,14 +352,14 @@ function ativarPlat(pi) {
     document.querySelectorAll(".plat-panel").forEach((p, i) => p.classList.toggle("ativo", i === pi));
 }
 
-// ── Descriptografa e exibe um arquivo individual ──
+// ── Abrir e descriptografar arquivo individual ──
 async function abrirArquivo(pi, ai) {
-    const p        = plataformas[pi];
-    const a        = p.arquivos[ai];
+    const p = plataformas[pi];
+    const a = p.arquivos[ai];
     const selector = document.getElementById(`sel-${pi}`);
-    const frame    = document.getElementById(`frame-${pi}`);
-    const loader   = document.getElementById(`fload-${pi}`);
-    const body     = document.getElementById(`fbody-${pi}`);
+    const frame = document.getElementById(`frame-${pi}`);
+    const loader = document.getElementById(`fload-${pi}`);
+    const body = document.getElementById(`fbody-${pi}`);
 
     selector.style.display = "none";
     frame.classList.add("visivel");
@@ -395,25 +368,19 @@ async function abrirArquivo(pi, ai) {
     document.getElementById(`finfo-${pi}`).textContent = `${(a.tam/1024).toFixed(1)} KB · ${a.tipo}`;
 
     try {
-        const key       = await obterChaveCripto(a.nonce);
+        const key = await obterChaveCripto(a.nonce);
         const decrypted = await descriptografarBloco(key, a.nonce, a.tag, a.data);
-        const text      = new TextDecoder().decode(decrypted);
-
+        const text = new TextDecoder().decode(decrypted);
         loader.style.display = "none";
 
         if (a.tipo === "web") {
             body.className = "content-body";
             body.innerHTML = `<iframe id="ci-${pi}" style="width:100%;height:100%;border:none"></iframe>`;
-            // srcdoc — conteúdo nunca aparece no "Ver código-fonte"
             document.getElementById(`ci-${pi}`).srcdoc = text;
         } else {
             body.className = "content-body code-mode";
-            body.innerHTML = `<pre>${text.replace(/</g,"&lt;").replace(/>/g,"&gt;")}</pre>`;
+            body.innerHTML = `<pre>${text.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>`;
         }
-
-        // Auto-destruição após exibir
-        // (sem auto-destruição)
-
     } catch(e) {
         loader.style.display = "none";
         body.className = "content-body code-mode";
@@ -422,42 +389,34 @@ async function abrirArquivo(pi, ai) {
 }
 
 function fecharFrame(pi) {
-    const frame    = document.getElementById(`frame-${pi}`);
+    const frame = document.getElementById(`frame-${pi}`);
     const selector = document.getElementById(`sel-${pi}`);
-    const body     = document.getElementById(`fbody-${pi}`);
+    const body = document.getElementById(`fbody-${pi}`);
     frame.classList.remove("visivel");
     selector.style.display = "";
     body.innerHTML = `<div class="loading-overlay" id="fload-${pi}"><div class="spin"></div>DESCRIPTOGRAFANDO…</div>`;
     body.className = "content-body";
 }
 
-// ── Helpers de criptografia AES-GCM ──
+// ── Criptografia AES-GCM ──
 async function obterChaveCripto(nonceB64) {
     if (keyCache.has(nonceB64)) return keyCache.get(nonceB64);
-
     let kb = Uint8Array.from(atob(chaveMestraAtual), c => c.charCodeAt(0));
-    // Garante 16 ou 32 bytes
-    if      (kb.length < 16) { const p = new Uint8Array(16); p.set(kb); kb = p; }
+    if (kb.length < 16) { const p = new Uint8Array(16); p.set(kb); kb = p; }
     else if (kb.length < 32) { const p = new Uint8Array(32); p.set(kb); kb = p; }
-    else if (kb.length > 32)   kb = kb.slice(0, 32);
-
+    else if (kb.length > 32) kb = kb.slice(0, 32);
     const k = await crypto.subtle.importKey("raw", kb, { name: "AES-GCM" }, false, ["decrypt"]);
     keyCache.set(nonceB64, k);
     return k;
 }
 
 async function descriptografarBloco(key, nonceB64, tagB64, dataB64) {
-    const iv  = Uint8Array.from(atob(nonceB64), c => c.charCodeAt(0));
-    const tag = Uint8Array.from(atob(tagB64),   c => c.charCodeAt(0));
-    const d   = Uint8Array.from(atob(dataB64),  c => c.charCodeAt(0));
-    return crypto.subtle.decrypt(
-        { name: "AES-GCM", iv, tagLength: 128 },
-        key,
-        new Uint8Array([...d, ...tag])
-    );
+    const iv = Uint8Array.from(atob(nonceB64), c => c.charCodeAt(0));
+    const tag = Uint8Array.from(atob(tagB64), c => c.charCodeAt(0));
+    const d = Uint8Array.from(atob(dataB64), c => c.charCodeAt(0));
+    return crypto.subtle.decrypt({ name: "AES-GCM", iv, tagLength: 128 }, key, new Uint8Array([...d, ...tag]));
 }
 
-// ── Alertas ──
 function mostrarErro(msg) {
     const el = document.getElementById("alertErr");
     el.textContent = "❌ " + msg;
@@ -469,24 +428,20 @@ function sair() {
     window.location.reload();
 }
 
-// ── Inicialização ──
 window.addEventListener("DOMContentLoaded", () => {
     document.getElementById("btnLogin").onclick = validar;
-    document.getElementById("chaveInput").addEventListener("keypress", e => {
-        if (e.key === "Enter") validar();
-    });
-    
+    document.getElementById("chaveInput").addEventListener("keypress", e => { if (e.key === "Enter") validar(); });
 
-    // Fundo animado (grade dourada)
-    const c   = document.getElementById("bgCanvas");
+    // Fundo animado
+    const c = document.getElementById("bgCanvas");
     const ctx = c.getContext("2d");
     let t = 0;
     function resize() { c.width = innerWidth; c.height = innerHeight; }
     function draw() {
         ctx.clearRect(0,0,c.width,c.height);
         ctx.strokeStyle = `rgba(255,215,0,${0.025 + 0.01*Math.sin(t*0.5)})`;
-        ctx.lineWidth   = 0.5;
-        for (let i = 0; i <= c.width;  i += 40) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,c.height); ctx.stroke(); }
+        ctx.lineWidth = 0.5;
+        for (let i = 0; i <= c.width; i += 40) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,c.height); ctx.stroke(); }
         for (let i = 0; i <= c.height; i += 40) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(c.width,i); ctx.stroke(); }
         t += 0.02;
         requestAnimationFrame(draw);
