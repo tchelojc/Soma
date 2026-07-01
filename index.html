@@ -61,7 +61,7 @@ footer{margin-top:1.5rem;font-size:.7rem;color:#2a6a6a}
 // ═══════════════════════════════════
 // CONFIGURAÇÃO BLINDADA
 // ═══════════════════════════════════
-const URL_BACKEND = "soma";
+const URL_BACKEND = "/proxy/soma";
 
 const TIMEOUT_MS = 15000;
 
@@ -103,7 +103,7 @@ function atualizarContagem() {
 // COMUNICAÇÃO COM BACKEND (COM TOKEN)
 // ═══════════════════════════════════
 async function obterChave(senha) {
-    const getUrl = `${URL_BACKEND}?action=getKeyWithPassword&password=${encodeURIComponent(senha)}&tk=${_TK}`;
+    const getUrl = `${URL_BACKEND}?action=getKeyWithPassword&password=${encodeURIComponent(senha)}`;
     
     let response;
     try {
@@ -117,7 +117,7 @@ async function obterChave(senha) {
         response = await fetch(URL_BACKEND, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ action: "getKeyWithPassword", password: senha, tk: _TK }),
+            body: JSON.stringify({ action: "getKeyWithPassword", password: senha }),
             signal: controller.signal
         });
         clearTimeout(timeoutId);
